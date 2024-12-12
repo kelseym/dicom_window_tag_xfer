@@ -1,0 +1,3 @@
+FROM pydicom/dicom:v3.6.5
+COPY ./workspace/ /workspace/
+WORKDIR /workspace

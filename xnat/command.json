@@ -1,0 +1,87 @@
+{
+    "name": "dicom_window_tag_xfer",
+    "description": "Read Window Center and Window Width from files in one dicom directory and applies those tags to dicom files in a second directory.",
+    "info-url": "",
+    "version": "0.1",
+    "schema-version": "1.0",
+    "type": "docker",
+    "image": "registry.nrg.wustl.edu/docker/nrg-repo/dicom_window_tag_xfer:0.1",
+    "command-line": "python3 main.py --reference /input/reference --modified /input/modified --output /output",
+    "reserve-memory": 4000,
+    "limit-memory": 4000,
+    "mounts": [
+        {
+            "name": "reference",
+            "writable": "false",
+            "path": "/input/reference"
+        },
+        {
+            "name": "modified",
+            "writable": "false",
+            "path": "/input/modified"
+        },
+        {
+            "name": "output",
+            "writable": "true",
+            "path": "/output"
+        }
+    ],
+    "inputs": [],
+    "outputs": [
+        {
+            "name": "output",
+            "description": "Re-tagged dicom output files.",
+            "mount": "output",
+            "required": true
+        }
+    ],
+    "xnat": [
+        {
+            "name": "dicom_window_tag_xfer",
+            "description": "Run dicom_window_tag_xfer on a scan",
+            "label": "dicom_window_tag_xfer",
+            "contexts": ["xnat:imageScanData"],
+            "external-inputs": [
+                {
+                    "name": "scan",
+                    "description": "Input scan",
+                    "type": "Scan",
+                    "required": true,
+                    "matcher": "'REFACED_DICOM' in @.resources[*].label",
+                    "provides-value-for-command-input": "scan-id"
+                }
+            ],
+            "derived-inputs": [
+                {
+                    "name": "modified-dicoms",
+                    "description": "The refaced dicom resource on the scan",
+                    "type": "Resource",
+                    "derived-from-wrapper-input": "scan",
+                    "provides-files-for-command-mount": "modified",
+                    "matcher": "@.label == 'REFACED_DICOM'"
+                },
+                                {
+                    "name": "reference-dicoms",
+                    "description": "The original dicom resource on the scan",
+                    "type": "Resource",
+                    "derived-from-wrapper-input": "scan",
+                    "provides-files-for-command-mount": "reference",
+                    "matcher": "@.label == 'DICOM'"
+                }
+            ],
+            "output-handlers": [
+                {
+                    "name": "retagged-dicom",
+                    "accepts-command-output": "output",
+                    "as-a-child-of-wrapper-input": "scan",
+                    "type": "Resource",
+                    "label": "REFACED_DICOM_WCWW",
+                    "format": "DICOM",
+                    "description": "Retagged DICOM scan files.",
+                    "tags": ["mri_reface", "wcww"]
+                }
+            ]
+        }
+    ],
+    "generic-resources": {"RESERVED": "1"}
+}
