@@ -7,12 +7,17 @@ from pydicom import dcmread
 from pydicom.misc import is_dicom
 import os
 import logging
+import getpass
 
 def wcww_retag_all():
     parser = argparse.ArgumentParser(description="Given an XNAT directory tree, search for REFACED_DICOM resources "
                                                  "(with files) and create REFACED_DICOM_WCWW resources with "
                                                  "Window Center and Window Width tags from the corresponding "
                                                  "DICOM files.")
+    parser.add_argument('-u', '--user', required=True, help='Target XNAT username')
+    parser.add_argument('-p', '--password', required=False, help='XNAT password')
+    parser.add_argument('--url', required=True, help='Target XNAT base URL')
+    parser.add_argument('--project', required=True, help='Target XNAT project ID')
     parser.add_argument('--root', required=True, help='XNAT directory tree. e.g. /data/xnat/archive/PROJECT_ID')
     parser.add_argument('--reference', required=False, default='DICOM',
                         help='Reference DICOM resource pattern. e.g. DICOM')
@@ -20,7 +25,14 @@ def wcww_retag_all():
                         help='Modified DICOM pattern. e.g. REFACED_DICOM')
     parser.add_argument('--output', required=False, default='REFACED_DICOM_WCWW',
                         help='Output resource. e.g. REFACED_DICOM_WCWW')
+    parser.add_argument('-v', '--verbose', action='store_true', help='Enable verbose logging')
     args = parser.parse_args()
+
+    if args.verbose:
+        logging.getLogger().setLevel(logging.DEBUG)
+
+    if not args.password:
+        args.password = getpass.getpass(prompt='Enter XNAT password: ')
 
     # Find all scan directories that contain a populated 'modified' folder and a 'reference' folder
     refaced_dicom_resources = find_resources(args.root, args.reference, args.modified)
@@ -60,7 +72,7 @@ def create_retagged_resources(refaced_dicom_resources, modified, reference, outp
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
         else:
-            if os.listdir(output_dir):
+            if list_directory(output_dir, exclude=".xml"):
                 logging.error(f"Error: {output_dir} is not empty.")
                 continue
 
@@ -121,6 +133,14 @@ def get_window_tags(dicom_file_or_dir):
         if center and width:
             return center, width, explanation if explanation else None
     return None, None, None
+
+def list_directory(directory, exclude=None):
+    files = []
+    for file in os.listdir(directory):
+        if exclude is not None and not exclude in file:
+            files.append(file)
+    return files
+
 
 if __name__ == '__main__':
     wcww_retag_all()
