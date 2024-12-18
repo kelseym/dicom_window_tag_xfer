@@ -43,15 +43,22 @@ def wcww_retag_all():
         args.password = getpass.getpass(prompt='Enter XNAT password: ')
 
     # Find all scan directories that contain a populated 'modified' folder and a 'reference' folder
-    refaced_dicom_resource_scans = find_resources(args.root, args.reference, args.modified)
+    # Exclude directories that already contain a populated 'output' folder
+    refaced_dicom_resource_scans = find_resources(args.root, args.reference, args.modified, args.output)
 
     create_retagged_resources(refaced_dicom_resource_scans, args)
 
 
-def find_resources(root, reference, modified):
+def find_resources(root, reference, modified, output):
     resource_scans = []
     for root, dirs, files in os.walk(root):
         if modified in dirs and reference in dirs:
+            # Check for existing and populated output directory
+            if output in dirs:
+                output_dir = str(os.path.join(root, output))
+                if list_directory(output_dir, exclude=".xml"):
+                    logging.debug(f"Skipping: {output_dir}. Already contains files.")
+                    continue
             # Check for valid and populated directories
             dicom_exists = False
             modified_dir = str(os.path.join(root, modified))
@@ -77,11 +84,13 @@ def create_retagged_resources(refaced_dicom_resource_scans, args):
         reference = args.reference
         output = args.output
         for scan_dir in refaced_dicom_resource_scans:
-            xnat_resource = register_new_retagged_resources(connection, project, scan_dir, output)
-            if xnat_resource:
-                populate_new_retagged_resources(scan_dir, modified, reference, output)
-                refresh_resource_catalog(connection, xnat_resource)
-
+            try:
+                xnat_resource = register_new_retagged_resources(connection, project, scan_dir, output)
+                if xnat_resource:
+                    populate_new_retagged_resources(scan_dir, modified, reference, output)
+                    refresh_resource_catalog(connection, xnat_resource)
+            except Exception as e:
+                logging.error(f"Error creating retagged resources for {scan_dir}\n{e}")
 
 def refresh_resource_catalog(connection, xnat_resource):
     try:
